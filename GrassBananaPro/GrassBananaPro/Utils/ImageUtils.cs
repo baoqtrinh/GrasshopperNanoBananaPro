@@ -1,13 +1,24 @@
-﻿using Glab.C_Documentation;
+﻿using System;
+using System.Collections.Generic;
+using SD = System.Drawing;
+using System.IO;
+using System.Linq;
+using System.Numerics;
+using System.Text;
+using System.Threading.Tasks;
+using Glab.C_Documentation;
+using Grasshopper.Kernel;
+using Rhino.Geometry;
+using SixLabors.Fonts;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.Drawing;
+using SixLabors.ImageSharp.Drawing.Processing;
 using SixLabors.ImageSharp.PixelFormats;
 using SixLabors.ImageSharp.Processing;
-using System;
-using System.Collections.Generic;
-using System.IO;
+using Color = SixLabors.ImageSharp.Color;
+using PointF = SixLabors.ImageSharp.PointF;
 using Rectangle = SixLabors.ImageSharp.Rectangle;
-using SD = System.Drawing;
+using SLF = SixLabors.Fonts;
 
 namespace Glab.Utilities
 {
@@ -42,6 +53,139 @@ namespace Glab.Utilities
             }
         }
 
+        /// <summary>
+        /// Draws filled curves with colored borders on the source image using image coordinates at high resolution
+        /// </summary>
+        /// <param name="frameCurve">The curve defining the frame/boundary</param>
+        /// <param name="curves">The Rhino curves to draw (optional, single curve or multiple curves)</param>
+        /// <param name="lineSetting">Settings for line appearance including color, width, and pattern</param>
+        /// <param name="fillColor">The fill color for the regions made from the curves</param>
+        /// <param name="frameFillColor">The fill color for the frame, defaults to transparent</param>
+        /// <param name="maxSize">Maximum size for the output image, defaults to 3840 (4K UHD)</param>
+        /// <param name="UseWidth">If true, uses width for scaling; otherwise uses height</param>
+        /// <returns>A GImage containing the drawn curves with fills</returns>
+        public static GImage DrawCurvesWithFill(Curve frameCurve, List<Curve> curves, LineSetting lineSetting, Color? fillColor, int maxSize = 3840, bool UseWidth = true, Color? frameFillColor = null)
+        {
+            if (frameCurve == null || lineSetting == null)
+                return null;
+
+            // Set default frame fill color to transparent if not provided
+            frameFillColor ??= Color.Transparent;
+
+            // Create a new image based on the frameimage curve
+            BoundingBox bbox = frameCurve.GetBoundingBox(true);
+
+            // Calculate dimensions and scaling factor
+            double width = bbox.Max.X - bbox.Min.X;
+            double height = bbox.Max.Y - bbox.Min.Y;
+
+            // Determine scaling factor based on maxSize and UseWidth
+            double scaleFactor = UseWidth ? maxSize / width : maxSize / height;
+            int imageWidth = (int)Math.Ceiling(width * scaleFactor);
+            int imageHeight = (int)Math.Ceiling(height * scaleFactor);
+
+            // Create frame image with calculated dimensions
+            GImage frameImage = new GImage(new Rectangle(0, 0, imageWidth, imageHeight), SD.Color.Transparent);
+            frameImage.CreateInitialImage();
+
+            // Transform and coordinates for all curves
+            var translationX = -bbox.Min.X;
+            var translationY = -bbox.Min.Y;
+
+            // Flip Y axis transform
+            var flipYTransform = Matrix3x2.CreateScale(1, -1, new PointF(0, frameImage.Image.Height / 2f));
+
+            // Mutate the source image directly
+            frameImage.Image.Mutate(ctx =>
+            {
+                // Transform the frame curve first to use it when no other curves are provided
+                Curve transformedFrameCurve = frameCurve.DuplicateCurve();
+                Transform translateFrame = Transform.Translation(translationX, translationY, 0);
+                Transform scaleFrame = Transform.Scale(new Point3d(0, 0, 0), scaleFactor);
+                transformedFrameCurve.Transform(translateFrame);
+                transformedFrameCurve.Transform(scaleFrame);
+
+                // Fill the entire frame region with the provided frame fill color
+                var frameList = new List<Curve> { transformedFrameCurve };
+                var framePath = ConvertRhinoCurvesToPath(frameList);
+                if (framePath != null)
+                {
+                    // Flip Y axis
+                    framePath = framePath.Transform(flipYTransform);
+                    ctx.Fill(frameFillColor.Value, framePath);
+                }
+
+                if (curves != null && curves.Count > 0)
+                {
+                    // Clone and transform each curve in the list
+                    var transformedCurves = new List<Curve>();
+                    foreach (var curve in curves)
+                    {
+                        Curve drawCurve = curve.DuplicateCurve();
+                        Transform translate = Transform.Translation(translationX, translationY, 0);
+                        Transform scale = Transform.Scale(new Point3d(0, 0, 0), scaleFactor);
+                        drawCurve.Transform(translate);
+                        drawCurve.Transform(scale);
+                        transformedCurves.Add(drawCurve);
+                    }
+
+                    // Convert curves to IPath
+                    var imagePath = ConvertRhinoCurvesToPath(transformedCurves);
+                    if (imagePath == null)
+                        return;
+
+                    // Flip Y axis
+                    imagePath = imagePath.Transform(flipYTransform);
+
+                    // Fill the region defined by the curve if fillColor is provided and the curve is closed
+                    if (fillColor != Color.Transparent)
+                    {
+                        foreach (var curve in transformedCurves)
+                        {
+                            if (curve.IsClosed)
+                            {
+                                var closedPath = ConvertRhinoCurvesToPath(new List<Curve> { curve });
+                                if (closedPath != null)
+                                {
+                                    closedPath = closedPath.Transform(flipYTransform);
+                                    ctx.Fill(fillColor.Value, closedPath);
+                                }
+                            }
+                        }
+                    }
+
+                    // Draw the curve outline with the specified border color and stroke width from LineSetting
+                    if (lineSetting.LinePattern != null && lineSetting.LinePattern.Length > 0)
+                    {
+                        // Create a dash pattern for the pen
+                        float[] dashPattern = lineSetting.LinePattern.Select(p => (float)p).ToArray();
+
+                        // Use PathBuilder to create a styled path
+                        var path = imagePath;
+
+                        // Draw with the dash pattern using a pattern pen
+                        var options = new DrawingOptions()
+                        {
+                            GraphicsOptions = new GraphicsOptions()
+                            {
+                                Antialias = true
+                            }
+                        };
+
+                        var patternPen = new PatternPen(lineSetting.LineColor, lineSetting.LineWidth, dashPattern);
+                        ctx.Draw(options, patternPen, path);
+                    }
+                    else
+                    {
+                        // For solid lines, just use the standard Draw method with color and width
+                        ctx.Draw(lineSetting.LineColor, lineSetting.LineWidth, imagePath);
+                    }
+                }
+            });
+
+            return frameImage;
+        }
+       
         /// <summary>
         /// Overlaps multiple images on top of each other in sequence
         /// </summary>
@@ -343,6 +487,6 @@ namespace Glab.Utilities
             return FlipGImage(gImage, false);
         }
 
-
+        
     }
 }

@@ -586,7 +586,7 @@ namespace Glab.C_AI.Gemini
                     }
                 }
 
-                return json.ToString(Formatting.Indented);
+                return JsonConvert.SerializeObject(json, Formatting.Indented);
             }
             catch
             {

@@ -1,0 +1,130 @@
+<Window x:Class="Glab.C_Documentation.DrawImg.MaskPainterWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Image Mask Painter" 
+        Height="800" Width="1200"
+        WindowStartupLocation="CenterScreen"
+        Background="#FF2D2D30"
+        AllowsTransparency="False"
+        Opacity="1">
+    <Window.Resources>
+        <!-- Modern Dark Theme Styles -->
+        <Style TargetType="Button">
+            <Setter Property="Background" Value="#FF3F3F46"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="BorderBrush" Value="#FF007ACC"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Padding" Value="10,5"/>
+            <Setter Property="Margin" Value="5"/>
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="#FF007ACC"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style TargetType="Slider">
+            <Setter Property="Foreground" Value="#FF007ACC"/>
+            <Setter Property="Margin" Value="5"/>
+        </Style>
+
+        <Style TargetType="TextBlock">
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="Margin" Value="5"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+
+        <Style TargetType="RadioButton">
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="Margin" Value="5"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+    </Window.Resources>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Top Toolbar -->
+        <Border Grid.Row="0" Background="#FF1E1E1E" BorderBrush="#FF007ACC" BorderThickness="0,0,0,1" Padding="10">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <!-- Tool Selection -->
+                <StackPanel Grid.Column="0" Orientation="Horizontal">
+                    <TextBlock Text="Tool:" FontWeight="Bold" FontSize="16" Margin="5,0,10,0"/>
+                    <RadioButton x:Name="RadioPaint" Content="Paint" IsChecked="True" GroupName="Tool" FontSize="14"/>
+                    <RadioButton x:Name="RadioErase" Content="Erase" GroupName="Tool" FontSize="14"/>
+                </StackPanel>
+
+                <!-- Brush Settings -->
+                <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Center">
+                    <TextBlock Text="Brush Size:" FontSize="14"/>
+                    <Slider x:Name="SliderBrushSize" Minimum="1" Maximum="100" Value="20" Width="150" 
+                            TickFrequency="1" IsSnapToTickEnabled="True"/>
+                    <TextBlock x:Name="TextBrushSize" Text="20" Width="30" FontSize="14"/>
+                </StackPanel>
+
+                <!-- Color Picker -->
+                <StackPanel Grid.Column="2" Orientation="Horizontal">
+                    <TextBlock Text="Mask Color:" FontSize="14"/>
+                    <Border x:Name="ColorPreview" Width="40" Height="30" BorderBrush="White" BorderThickness="1" 
+                            Background="Red" Margin="5" Cursor="Hand" MouseLeftButtonDown="ColorPreview_MouseLeftButtonDown"/>
+                </StackPanel>
+
+                <!-- Zoom Slider -->
+                <StackPanel Grid.Column="3" Orientation="Horizontal" Margin="20,0,0,0">
+                    <TextBlock Text="Zoom:" FontSize="14"/>
+                    <Slider x:Name="SliderZoom" Minimum="0.1" Maximum="10" Value="1" Width="150" TickFrequency="0.1"/>
+                </StackPanel>
+
+                <!-- Zoom Percentage Display -->
+                <StackPanel Grid.Column="4" Orientation="Horizontal" Margin="20,0,0,0">
+                    <TextBlock Text="Current Zoom:" FontSize="14"/>
+                    <TextBlock x:Name="ZoomPercentText" Text="100%" FontSize="14" Width="60"/>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- Canvas Area -->
+        <Border Grid.Row="1" Background="#FF252526" Margin="10">
+            <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Disabled" PanningMode="None" Focusable="False">
+                <Grid x:Name="CanvasContainer">
+                    <Canvas x:Name="ImageCanvas" 
+                            Background="Transparent"
+                            MouseLeftButtonDown="Canvas_MouseLeftButtonDown"
+                            MouseMove="Canvas_MouseMove"
+                            MouseLeftButtonUp="Canvas_MouseLeftButtonUp"
+                            ClipToBounds="True">
+                        <Image x:Name="DisplayImage" Stretch="None"/>
+                        <Canvas x:Name="MaskCanvas" Background="Transparent"/>
+                    </Canvas>
+                </Grid>
+            </ScrollViewer>
+        </Border>
+
+        <!-- Bottom Buttons -->
+        <Border Grid.Row="2" Background="#FF1E1E1E" BorderBrush="#FF007ACC" BorderThickness="0,1,0,0" Padding="10">
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                <Button x:Name="BtnClear" Content="Clear Mask" Width="120" Click="BtnClear_Click"/>
+                <Button x:Name="BtnUndo" Content="Undo" Width="100" Click="BtnUndo_Click"/>
+                <Button x:Name="BtnSave" Content="Apply &amp; Close" Width="120" Click="BtnSave_Click"/>
+                <Button x:Name="BtnCancel" Content="Cancel" Width="100" Click="BtnCancel_Click"/>
+            </StackPanel>
+        </Border>
+    </Grid>
+</Window>
+
+
+
